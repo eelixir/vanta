@@ -1,25 +1,22 @@
 import os
-import hashlib
+import bcrypt
 
 def encrypt_password(password):
-    global hash_password
-    hash_object = hashlib.sha256()
-    hash_object.update(password.encode())
-    hash_password = hash_object.hexdigest()
-    return hash_password
+    global hashed_password, salt
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed_password
 
 
 def enter_password():
-    entry = input("Enter current password: ")
-    hash_object = hashlib.sha256()
-    hash_object.update(entry.encode())
-    hash_entry = hash_object.hexdigest()
+    attempt = input("Enter current password: ")
+    hashed_attempt = bcrypt.hashpw(attempt.encode('utf-8'), salt)
 
-    if hash_entry == hash_password:
-        print(f"entry = {hash_entry} , password = {hash_password}")
+    if hashed_attempt == hashed_password:
+        print(f"entry = {hashed_attempt} , password = {hashed_password}")
         print("password correct")
     else:
-        print(f"entry = {hash_entry} , password = {hash_password}")
+        print(f"entry = {hashed_attempt} , password = {hashed_password}")
         print("password incorrect")
 
 
