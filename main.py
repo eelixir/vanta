@@ -1,5 +1,11 @@
-import os
 import bcrypt
+import secrets
+
+# To-Do
+# - password generation
+# - password complexity  (minimum length / complexity for created passwords)
+# - brute force protection (rate limiting / delay after failed attempts)
+# - error handling for encoding errors
 
 def encrypt_password(password):
     salt = bcrypt.gensalt()
@@ -11,11 +17,9 @@ def enter_password(hashed_password, salt):
     attempt = input("Enter current password: ")
     hashed_attempt = bcrypt.hashpw(attempt.encode('utf-8'), salt)
 
-    if hashed_attempt == hashed_password:
-        print(f"entry = {hashed_attempt} , password = {hashed_password}")
+    if secrets.compare_digest(hashed_attempt, hashed_password) == True:
         print("password correct")
     else:
-        print(f"entry = {hashed_attempt} , password = {hashed_password}")
         print("password incorrect")
 
 
