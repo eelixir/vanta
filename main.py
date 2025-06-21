@@ -1,98 +1,237 @@
 import bcrypt
 import secrets
 import string
-from getpass import getpass
+import time
+import sqlite3
 
-# To-Do
-# - brute force protection (rate limiting / delay after failed attempts)
+# To-do
+# Add check to see if master password already exists in database when launching program
+# Change _encrypt_password to symmetric instead of hashing
+# Fix SQL Injection by using parameterized queries
+# Add database error handling
+# Add password view functionality
 
-def encrypt_password(password):
-    salt = bcrypt.gensalt()
-    try:
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-    except UnicodeEncodeError:
-        print("Encoding error. Please try again with valid characters.")
-        return None, None
-    return hashed_password, salt
-
-
-def enter_master_password(hashed_password, salt):
-    attempt = input("Enter master password: ")
-    try:
-        hashed_attempt = bcrypt.hashpw(attempt.encode('utf-8'), salt)
-    except UnicodeEncodeError:
-        print("Encoding error. Please try again with valid characters.")
-        return None, None
-
-    if secrets.compare_digest(hashed_attempt, hashed_password) == True:
-        print("master password correct")
-    else:
-        print("master password incorrect")
-
-
-def create_master_password():
-    while True: 
-        creation_decision = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
-
-        if creation_decision == "create":
-            while True:
-                password = input("Create master password: ")
-
-                if complexity_check(password):
-                    print("Password created successfully.")
-                    break
-                else:
-                    pass
-
-            hashed_password, salt = encrypt_password(password)
-            enter_master_password(hashed_password, salt)
-            return False
-        
-        elif creation_decision == "generate":
-            password = generate_password()
-            print(f"This is your master password: {password}")
-
-            hashed_password, salt = encrypt_password(password)
-            enter_master_password(hashed_password, salt)
-            return False
-        
-        else:
-            print("invalid input")
-
-
-def generate_password(length=16):
-    chars = string.ascii_letters + string.digits + string.punctuation
-    return ''.join(secrets.choice(chars) for _ in range(length))
-
-
-def complexity_check(password):
-    valid = True
-
-    if len(password) < 12:
-        print("Password must be at least 12 characters.")
-        valid = False
-
-    if not any(c.isupper() for c in password):
-        print("Password must contain uppercase.")
-        valid = False
-
-    if not any(c.islower() for c in password):
-        print("Password must contain lowercase.")
-        valid = False
-
-    if not any(c.isdigit() for c in password):
-        print("Password must contain digits.")
-        valid = False
-
-    if not any(c in string.punctuation for c in password):
-        print("Password must contain symbols.")
-        valid = False
-
-    return valid
-
+class PasswordManager:
+    def __init__(self):
+        self.master_hash = None
+        self.master_salt = None
+        self.is_authenticated = False
     
+
+    def _encrypt_master_password(self, password):
+        """Encrypt a password with bcrypt"""
+        salt = bcrypt.gensalt()
+
+        try:
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+            
+            with sqlite3.connect("password.db") as connection:
+                cursor = connection.cursor()
+                
+                # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
+                master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
+                    id INTEGER PRIMARY KEY,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )'''
+
+                cursor.execute(master_password_table)
+                
+                # Store the hashed password in database
+                cursor.execute('''INSERT OR REPLACE INTO master_password 
+                                (id, password_hash, salt) 
+                                VALUES (1, ?, ?)''', 
+                            (hashed_password.decode('utf-8'), salt.decode('utf-8')))
+                
+                connection.commit()
+            
+            return hashed_password, salt
+
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return None, None
+        
+        except UnicodeEncodeError:
+            print("Encoding error. Please try again with valid characters.")
+            return None, None
+        
+
+    def _verify_master_password(self, attempt):
+        """Verify an attempted master password"""
+        try:
+            hashed_attempt = bcrypt.hashpw(attempt.encode('utf-8'), self.master_salt)
+            return secrets.compare_digest(hashed_attempt, self.master_hash)
+        
+        except UnicodeEncodeError:
+            print("Encoding error. Please try again with valid characters.")
+            return False
+        
+
+    def _encrypt_password(self, password):
+        """Encrypt a password with bcrypt"""
+        salt = bcrypt.gensalt()
+
+        try:
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+            return hashed_password, salt
+        
+        except UnicodeEncodeError:
+            print("Encoding error. Please try again with valid characters.")
+            return None, None
+        
+
+    def authenticate(self):
+        """Prompt for master password until correct"""
+        while not self.is_authenticated:
+            attempt = input("Enter master password: ")
+            
+            if self._verify_master_password(attempt):
+                print("Master password correct")
+                self.is_authenticated = True
+                return True
+            else:
+                print("Master password incorrect")
+                print("Try again in 5 seconds")
+                time.sleep(5)
+    
+
+    def create_master_password(self):
+        """Create or generate a new master password"""
+        while True:
+            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+            
+            if choice == "create":
+                password = self._get_user_password()
+                break
+            elif choice == "generate":
+                password = self._generate_password()
+                print(f"This is your master password: {password}")
+                break
+            else:
+                print("Invalid input")
+        
+        # Store the master password hash and salt
+        self.master_hash, self.master_salt = self._encrypt_master_password(password)
+        
+        # Authenticate with the new password
+        self.authenticate()
+    
+
+    def _get_user_password(self):
+        """Get a user-created password that meets complexity requirements"""
+        while True:
+            password = input("Create master password: ")
+            if self._check_complexity(password):
+                print("Password created successfully.")
+                return password
+    
+
+    def _generate_password(self, length=16):
+        """Generate a random password"""
+        chars = string.ascii_letters + string.digits + string.punctuation
+        return ''.join(secrets.choice(chars) for _ in range(length))
+    
+
+    def _check_complexity(self, password):
+        """Check if password meets complexity requirements"""
+        valid = True
+        requirements = []
+        
+        if len(password) < 12:
+            requirements.append("at least 12 characters")
+            valid = False
+        
+        if not any(c.isupper() for c in password):
+            requirements.append("uppercase letters")
+            valid = False
+        
+        if not any(c.islower() for c in password):
+            requirements.append("lowercase letters")
+            valid = False
+        
+        if not any(c.isdigit() for c in password):
+            requirements.append("digits")
+            valid = False
+        
+        if not any(c in string.punctuation for c in password):
+            requirements.append("symbols")
+            valid = False
+        
+        if not valid:
+            print(f"Password must contain: {', '.join(requirements)}")
+        
+        return valid
+
+
+    def run(self):
+        """Main application loop"""
+        print("Welcome to Password Manager")
+        self.create_master_password()
+        
+        if self.is_authenticated:
+            print("Access granted to password database!")
+            # Future: password management functionality here
+            with sqlite3.connect("password.db") as connection:
+                cursor = connection.cursor()
+                
+                # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
+                password_table = '''CREATE TABLE IF NOT EXISTS passwords (
+                    id INTEGER PRIMARY KEY,
+                    website TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )'''
+
+                cursor.execute(password_table)
+                connection.commit()
+
+        while True:
+            new_password_check = input("Do you want to add or view a password? (add/view): ")
+
+            if new_password_check == "add":
+                with sqlite3.connect("password.db") as connection:
+                    cursor = connection.cursor()
+                    
+                    website = input ("Enter website: ")
+                    username = input("Enter username: ")
+
+                    while True:
+                        choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+                        
+                        if choice == "create":
+                            password = self._get_user_password()
+                            break
+                        elif choice == "generate":
+                            password = self._generate_password()
+                            print(f"This is your password: {password}")
+                            break
+                        else:
+                            print("Invalid input")
+                    
+                    password_hash, salt = self._encrypt_password(password)
+
+                    # Store the hashed password in database
+                    cursor.execute('''INSERT OR REPLACE INTO passwords
+                                    (id, website, username, password_hash, salt) 
+                                    VALUES (NULL, ?, ?, ?, ?)''', 
+                                (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
+                    
+                    connection.commit()
+                    print("Password added successfully")
+
+            elif new_password_check == "view":
+                pass
+                # add code to view a password
+            else:
+                print("Choose 'add' or 'view'")
+
 def main():
-    create_master_password()
+    manager = PasswordManager()
+    manager.run()
+
 
 if __name__ == "__main__":
     main()
