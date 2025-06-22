@@ -3,6 +3,7 @@ import secrets
 import string
 import time
 import sqlite3
+import os
 
 # To-do
 # Change _encrypt_password to symmetric instead of hashing
@@ -12,11 +13,12 @@ class PasswordManager:
         self.master_hash = None
         self.master_salt = None
         self.is_authenticated = False
+        self.db_path = os.path.join(os.path.dirname(__file__), "password.db")
     
     def _check_master_password_exists(self):
         """Check is a master password already exists in the database"""
         try:
-            with sqlite3.connect("password.db") as connection:
+            with sqlite3.connect(self.db_path) as connection:
                 cursor = connection.cursor()
 
                 # Create master_password table if it doesn't exist
@@ -51,7 +53,7 @@ class PasswordManager:
         try:
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
             
-            with sqlite3.connect("password.db") as connection:
+            with sqlite3.connect(self.db_path) as connection:
                 cursor = connection.cursor()
                 
                 # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
@@ -207,7 +209,7 @@ class PasswordManager:
         if self.is_authenticated:
             print("Access granted to password database!")
 
-            with sqlite3.connect("password.db") as connection:
+            with sqlite3.connect(self.db_path) as connection:
                 cursor = connection.cursor()
                 
                 try:
@@ -232,7 +234,7 @@ class PasswordManager:
 
             # Select and then view a password from the database
             if manager_process == "view":
-                with sqlite3.connect("password.db") as connection:
+                with sqlite3.connect(self.db_path) as connection:
                     cursor = connection.cursor()
                     
                     try:
@@ -265,7 +267,7 @@ class PasswordManager:
                         print(f"Database error: {e}")
                         
             elif manager_process == "add":
-                with sqlite3.connect("password.db") as connection:
+                with sqlite3.connect(self.db_path) as connection:
                     cursor = connection.cursor()
                     
                     try:
@@ -300,7 +302,7 @@ class PasswordManager:
                         print(f"Database error: {e}")
 
             elif manager_process == "delete":
-                with sqlite3.connect("password.db") as connection:
+                with sqlite3.connect(self.db_path) as connection:
                     cursor = connection.cursor()
                     
                     try:
