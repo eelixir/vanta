@@ -5,9 +5,7 @@ import time
 import sqlite3
 
 # To-do
-# Add check to see if master password already exists in database when launching program
 # Change _encrypt_password to symmetric instead of hashing
-# Fix SQL Injection by using parameterized queries
 
 class PasswordManager:
     def __init__(self):
@@ -15,6 +13,36 @@ class PasswordManager:
         self.master_salt = None
         self.is_authenticated = False
     
+    def _check_master_password_exists(self):
+        """Check is a master password already exists in the database"""
+        try:
+            with sqlite3.connect("password.db") as connection:
+                cursor = connection.cursor()
+
+                # Create master_password table if it doesn't exist
+                master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
+                    id INTEGER PRIMARY KEY,
+                    password_hash TEXT NOT NULL,
+                    salt TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )'''
+                cursor.execute(master_password_table)
+
+                # Check if master password exists
+                cursor.execute("SELECT password_hash, salt FROM master_password WHERE id = 1")
+                result = cursor.fetchone()
+
+                if result:
+                    self.master_hash = result[0].encode('utf-8')
+                    self.master_salt = result[1].encode('utf-8')
+                    return True
+                else:
+                    return False
+                
+        except sqlite3.Error as e:
+            print(f"Database error: {e}")
+            return False
+
 
     def _encrypt_master_password(self, password):
         """Encrypt a password with bcrypt"""
@@ -165,7 +193,16 @@ class PasswordManager:
     def run(self):
         """Main application loop"""
         print("Welcome to Password Manager")
-        self.create_master_password()
+
+        # Check is master password already exists
+        if self._check_master_password_exists():
+            print("Master password found. Please authenticate.")
+            self.authenticate()
+
+        else:
+            print("No master password found. Please create one.")
+            self.create_master_password()
+        
         
         if self.is_authenticated:
             print("Access granted to password database!")
