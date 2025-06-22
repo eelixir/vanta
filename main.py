@@ -8,7 +8,6 @@ import sqlite3
 # Add check to see if master password already exists in database when launching program
 # Change _encrypt_password to symmetric instead of hashing
 # Fix SQL Injection by using parameterized queries
-# Add database error handling
 
 class PasswordManager:
     def __init__(self):
@@ -43,8 +42,8 @@ class PasswordManager:
                                 VALUES (1, ?, ?)''', 
                             (hashed_password.decode('utf-8'), salt.decode('utf-8')))
                 
-                connection.commit()
-            
+                connection.commit()       
+                     
             return hashed_password, salt
 
         except sqlite3.Error as e:
@@ -174,18 +173,22 @@ class PasswordManager:
             with sqlite3.connect("password.db") as connection:
                 cursor = connection.cursor()
                 
-                # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
-                password_table = '''CREATE TABLE IF NOT EXISTS passwords (
-                    id INTEGER PRIMARY KEY,
-                    website TEXT NOT NULL,
-                    username TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )'''
+                try:
+                    # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
+                    password_table = '''CREATE TABLE IF NOT EXISTS passwords (
+                        id INTEGER PRIMARY KEY,
+                        website TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        salt TEXT NOT NULL,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )'''
 
-                cursor.execute(password_table)
-                connection.commit()
+                    cursor.execute(password_table)
+                    connection.commit()
+
+                except sqlite3.Error as e:
+                    print(f"Database error: {e}")
 
         while True:
             manager_process = input("Do you want to view, add or delete a password? (view/add/delete): ")
@@ -207,6 +210,7 @@ class PasswordManager:
                             
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to view: ").strip()
+
                             
                             # fix: change to print plain text password rather than hash
                             cursor.execute("SELECT password_hash FROM passwords WHERE id = ?", (selected_id,))
@@ -227,32 +231,36 @@ class PasswordManager:
                 with sqlite3.connect("password.db") as connection:
                     cursor = connection.cursor()
                     
-                    website = input ("Enter website: ")
-                    username = input("Enter username: ")
+                    try:
+                        website = input ("Enter website: ")
+                        username = input("Enter username: ")
 
-                    while True:
-                        choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+                        while True:
+                            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+                            
+                            if choice == "create":
+                                password = self._get_user_password()
+                                break
+                            elif choice == "generate":
+                                password = self._generate_password()
+                                print(f"This is your password: {password}")
+                                break
+                            else:
+                                print("Invalid input")
                         
-                        if choice == "create":
-                            password = self._get_user_password()
-                            break
-                        elif choice == "generate":
-                            password = self._generate_password()
-                            print(f"This is your password: {password}")
-                            break
-                        else:
-                            print("Invalid input")
-                    
-                    password_hash, salt = self._encrypt_password(password)
+                        password_hash, salt = self._encrypt_password(password)
 
-                    # Store the hashed password in database
-                    cursor.execute('''INSERT OR REPLACE INTO passwords
-                                    (id, website, username, password_hash, salt) 
-                                    VALUES (NULL, ?, ?, ?, ?)''', 
-                                (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
-                    
-                    connection.commit()
-                    print("Password added successfully")
+                        # Store the hashed password in database
+                        cursor.execute('''INSERT OR REPLACE INTO passwords
+                                        (id, website, username, password_hash, salt) 
+                                        VALUES (NULL, ?, ?, ?, ?)''', 
+                                    (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
+                        
+                        connection.commit()
+                        print("Password added successfully")
+
+                    except sqlite3.Error as e:
+                        print(f"Database error: {e}")
 
             elif manager_process == "delete":
                 with sqlite3.connect("password.db") as connection:
@@ -287,6 +295,7 @@ class PasswordManager:
                             
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
+
             else:
                 print("Choose 'view', 'add' or 'delete'")
 
