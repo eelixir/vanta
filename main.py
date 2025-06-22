@@ -9,7 +9,6 @@ import sqlite3
 # Change _encrypt_password to symmetric instead of hashing
 # Fix SQL Injection by using parameterized queries
 # Add database error handling
-# Add password view functionality
 
 class PasswordManager:
     def __init__(self):
@@ -171,7 +170,7 @@ class PasswordManager:
         
         if self.is_authenticated:
             print("Access granted to password database!")
-            # Future: password management functionality here
+
             with sqlite3.connect("password.db") as connection:
                 cursor = connection.cursor()
                 
@@ -222,9 +221,39 @@ class PasswordManager:
                     connection.commit()
                     print("Password added successfully")
 
+            # Select and then view a password from the database
             elif new_password_check == "view":
-                pass
-                # add code to view a password
+                with sqlite3.connect("password.db") as connection:
+                    cursor = connection.cursor()
+                    
+                    try:
+                        cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
+                        entries = cursor.fetchall()
+                        
+                        if entries:
+                            print("\nStored password entries:")
+                            print("-" * 50)
+                            for entry in entries:
+                                print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
+                            
+                            print("-" * 50)
+                            selected_id = input("Enter the ID of the password you want to view: ").strip()
+                            
+                            # fix: change to print plain text password rather than hash
+                            cursor.execute("SELECT password_hash FROM passwords WHERE id = ?", (selected_id,))
+                            result = cursor.fetchone()
+                            
+                            if result:
+                                print(f"\nPassword for entry ID {selected_id}: {result[0]}")
+                            else:
+                                print("No password found for that ID.")
+
+                        else:
+                            print("No passwords stored yet.")
+                            
+                    except sqlite3.Error as e:
+                        print(f"Database error: {e}")
+
             else:
                 print("Choose 'add' or 'view'")
 
