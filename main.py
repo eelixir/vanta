@@ -188,41 +188,10 @@ class PasswordManager:
                 connection.commit()
 
         while True:
-            new_password_check = input("Do you want to add or view a password? (add/view): ")
-
-            if new_password_check == "add":
-                with sqlite3.connect("password.db") as connection:
-                    cursor = connection.cursor()
-                    
-                    website = input ("Enter website: ")
-                    username = input("Enter username: ")
-
-                    while True:
-                        choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
-                        
-                        if choice == "create":
-                            password = self._get_user_password()
-                            break
-                        elif choice == "generate":
-                            password = self._generate_password()
-                            print(f"This is your password: {password}")
-                            break
-                        else:
-                            print("Invalid input")
-                    
-                    password_hash, salt = self._encrypt_password(password)
-
-                    # Store the hashed password in database
-                    cursor.execute('''INSERT OR REPLACE INTO passwords
-                                    (id, website, username, password_hash, salt) 
-                                    VALUES (NULL, ?, ?, ?, ?)''', 
-                                (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
-                    
-                    connection.commit()
-                    print("Password added successfully")
+            manager_process = input("Do you want to view, add or delete a password? (view/add/delete): ")
 
             # Select and then view a password from the database
-            elif new_password_check == "view":
+            if manager_process == "view":
                 with sqlite3.connect("password.db") as connection:
                     cursor = connection.cursor()
                     
@@ -253,9 +222,73 @@ class PasswordManager:
                             
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
+                        
+            elif manager_process == "add":
+                with sqlite3.connect("password.db") as connection:
+                    cursor = connection.cursor()
+                    
+                    website = input ("Enter website: ")
+                    username = input("Enter username: ")
 
+                    while True:
+                        choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+                        
+                        if choice == "create":
+                            password = self._get_user_password()
+                            break
+                        elif choice == "generate":
+                            password = self._generate_password()
+                            print(f"This is your password: {password}")
+                            break
+                        else:
+                            print("Invalid input")
+                    
+                    password_hash, salt = self._encrypt_password(password)
+
+                    # Store the hashed password in database
+                    cursor.execute('''INSERT OR REPLACE INTO passwords
+                                    (id, website, username, password_hash, salt) 
+                                    VALUES (NULL, ?, ?, ?, ?)''', 
+                                (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
+                    
+                    connection.commit()
+                    print("Password added successfully")
+
+            elif manager_process == "delete":
+                with sqlite3.connect("password.db") as connection:
+                    cursor = connection.cursor()
+                    
+                    try:
+                        cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
+                        entries = cursor.fetchall()
+                        
+                        if entries:
+                            print("\nStored password entries:")
+                            print("-" * 50)
+                            for entry in entries:
+                                print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
+                            
+                            print("-" * 50)
+                            selected_id = input("Enter the ID of the password you want to delete: ").strip()
+                            
+                            cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
+                            website_result = cursor.fetchone()
+                            
+                            if website_result:
+                                website_name = website_result[0]
+                                # Proceed to delete after confirming it exists
+                                cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
+                                print(f"\nPassword for website '{website_name}' (ID: {selected_id}) has been deleted.")
+                            else:
+                                print("No password found for that ID.")
+
+                        else:
+                            print("No passwords stored yet.")
+                            
+                    except sqlite3.Error as e:
+                        print(f"Database error: {e}")
             else:
-                print("Choose 'add' or 'view'")
+                print("Choose 'view', 'add' or 'delete'")
 
 def main():
     manager = PasswordManager()
