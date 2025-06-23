@@ -8,27 +8,42 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 import base64
-import hashlib
 
 # To-do
-# Confirmation for deletion
-# Empty Inputs: check if required inputs (like website, username, or master password) are empty
-# GUI
+# Encrypt the entire database using SQLCipher
+# Web UI with Flask
 
 class PasswordManager:
     def __init__(self):
         self.master_hash = None
         self.master_salt = None
         self.is_authenticated = False
+        self.fernet = None  
         self.DB_PATH = os.path.join(os.path.dirname(__file__), "password.db")
         self._initialize_database() 
-
 
     def _initialize_database(self):
         """Initialize database with all required tables"""
         try:
             with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
+
+                # Add encryption_salt column 
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS secrets (
+                        id INTEGER PRIMARY KEY,
+                        encryption_salt TEXT NOT NULL
+                    )
+                ''')                
+
+                # Initialize salt if empty
+                cursor.execute("SELECT encryption_salt FROM secrets WHERE id = 1")
+                if not cursor.fetchone():
+                    new_salt = os.urandom(16)  
+                    cursor.execute(
+                        "INSERT INTO secrets (id, encryption_salt) VALUES (1, ?)",
+                        (base64.b64encode(new_salt).decode(),)
+                    )
 
                 # Create master_password table
                 master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
@@ -102,7 +117,6 @@ class PasswordManager:
         except UnicodeEncodeError:
             print("Encoding error. Please try again with valid characters.")
             return None, None
-        
 
     def _verify_master_password(self, attempt):
         """Verify an attempted master password"""
@@ -113,36 +127,49 @@ class PasswordManager:
         except UnicodeEncodeError:
             print("Encoding error. Please try again with valid characters.")
             return False
-    
 
     def _derive_key(self, password):
+        """Derive encryption key using the dedicated salt"""
+        # Retrieve the encryption salt from the database
+        with sqlite3.connect(self.DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT encryption_salt FROM secrets WHERE id = 1")
+            result = cursor.fetchone()
+            if not result:
+                raise Exception("Encryption salt not found in database")
+            salt_b64 = result[0]
+            salt = base64.b64decode(salt_b64.encode())
+
+        # Derive key using PBKDF2
         kdf = PBKDF2HMAC(
-            algorithm = hashes.SHA256(),
-            length = 32,
-            salt = self.master_salt,
-            iterations = 100000
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt, 
+            iterations=600_000, 
         )
         return base64.urlsafe_b64encode(kdf.derive(password.encode()))
-
 
     def _encrypt_password(self, password):
         """Encrypt a password"""
         try:
+            if not self.fernet:
+                raise Exception("Encryption not initialized. Please authenticate first.")
             encrypted = self.fernet.encrypt(password.encode())
             return base64.b64encode(encrypted).decode('utf-8')
         except Exception as e:
             print(f"Encryption error: {e}")
             return None
-        
+
     def _decrypt_password(self, encrypted_password_b64):
         """Decrypt a password"""
         try:
+            if not self.fernet:
+                raise Exception("Decryption not initialized. Please authenticate first.")
             encrypted_bytes = base64.b64decode(encrypted_password_b64.encode('utf-8'))
             return self.fernet.decrypt(encrypted_bytes).decode()        
         except Exception as e:
             print(f"Decryption error: {e}")
             return None
-
 
     def authenticate(self):
         """Prompt for master password until correct"""
@@ -158,7 +185,6 @@ class PasswordManager:
                 print("Master password incorrect")
                 print("Try again in 5 seconds")
                 time.sleep(5)
-    
 
     def create_master_password(self):
         """Create or generate a new master password"""
@@ -170,7 +196,8 @@ class PasswordManager:
                 break
             elif choice == "generate":
                 password = self._generate_password()
-                print(f"This is your master password: {password}")
+                print(f"Generated master password: {password}")
+                print("Store this securely - you won't see it again!")
                 break
             else:
                 print("Invalid input")
@@ -178,9 +205,9 @@ class PasswordManager:
         # Store the master password hash and salt
         self.master_hash, self.master_salt = self._hash_master_password(password)
         
-        # Authenticate with the new password
+        # Initialize encryption with the new password
+        self.fernet = Fernet(self._derive_key(password))
         self.authenticate()
-    
 
     def _get_user_password(self):
         """Get a user-created password that meets complexity requirements"""
@@ -191,13 +218,11 @@ class PasswordManager:
             if self._check_complexity(password):
                 print("Password created successfully.")
                 return password
-    
 
     def _generate_password(self, length=16):
         """Generate a random password"""
         chars = string.ascii_letters + string.digits + string.punctuation
         return ''.join(secrets.choice(chars) for _ in range(length))
-    
 
     def _check_complexity(self, password):
         """Check if password meets complexity requirements"""
@@ -229,6 +254,12 @@ class PasswordManager:
         
         return valid
 
+    def _validate_input(self, value, field_name):
+        """Validate that input is not empty"""
+        if not value or not value.strip():
+            print(f"{field_name} cannot be empty.")
+            return False
+        return True
 
     def run(self):
         """Main application loop"""
@@ -246,7 +277,7 @@ class PasswordManager:
             print("Access granted to password database!")
 
         while True:
-            manager_process = input("Do you want to view, add, delete or update a password? (view/add/delete/update): ")
+            manager_process = input("Do you want to view, add, delete, update a password, or quit? (view/add/delete/update/quit): ")
 
             # Select and then view a password from the database
             if manager_process == "view":
@@ -266,12 +297,18 @@ class PasswordManager:
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to view: ").strip()
 
+                            if not self._validate_input(selected_id, "ID"):
+                                continue
+
                             cursor.execute("SELECT password FROM passwords WHERE id = ?", (selected_id,))
                             result = cursor.fetchone()
                             
                             if result:
                                 decrypted = self._decrypt_password(result[0])
-                                print(f"\nPassword for entry ID {selected_id}: {decrypted}")
+                                if decrypted:
+                                    print(f"\nPassword for entry ID {selected_id}: {decrypted}")
+                                else:
+                                    print("Failed to decrypt password.")
                             else:
                                 print("No password found for that ID.")
                         else:
@@ -285,8 +322,16 @@ class PasswordManager:
                     cursor = connection.cursor()
                     
                     try:
-                        website = input("Enter website: ")
-                        username = input("Enter username: ")
+                        # Validate inputs
+                        while True:
+                            website = input("Enter website: ").strip()
+                            if self._validate_input(website, "Website"):
+                                break
+
+                        while True:
+                            username = input("Enter username: ").strip()
+                            if self._validate_input(username, "Username"):
+                                break
 
                         while True:
                             choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ")
@@ -302,6 +347,9 @@ class PasswordManager:
                                 print("Invalid input")
                         
                         encrypted_password = self._encrypt_password(password)
+                        if not encrypted_password:
+                            print("Failed to encrypt password. Entry not saved.")
+                            continue
 
                         # Store the encrypted password in database
                         cursor.execute('''INSERT INTO passwords
@@ -330,9 +378,14 @@ class PasswordManager:
                                 print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
                             
                             print("-" * 50)
-                            selected_id = input("Enter the ID of the password you want to delete: ").strip()
 
                             while True:
+
+                                selected_id = input("Enter the ID of the password you want to delete: ").strip()
+
+                                if not self._validate_input(selected_id, "ID"):
+                                    continue
+
                                 delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ")
 
                                 if delete_confirmation == "yes":
@@ -374,6 +427,9 @@ class PasswordManager:
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to update: ").strip()
 
+                            if not self._validate_input(selected_id, "ID"):
+                                continue
+
                             cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
                             website_result = cursor.fetchone()
                             
@@ -383,9 +439,13 @@ class PasswordManager:
                                 while True:
                                     username_update_decision = input("Do you want to update the username? (yes/no): ")
                                     if username_update_decision == "yes":
-                                        new_username = input(f"Enter new username for {website_name}: ")
-                                        cursor.execute("UPDATE passwords SET username = ? WHERE id = ?", (new_username, selected_id,))
-                                        connection.commit()
+                                        while True:
+                                            new_username = input(f"Enter new username for {website_name}: ").strip()
+                                            if self._validate_input(new_username, "Username"):
+                                                cursor.execute("UPDATE passwords SET username = ? WHERE id = ?", (new_username, selected_id,))
+                                                connection.commit()
+                                                print("Username updated successfully.")
+                                                break
                                         break
                                     elif username_update_decision == "no":
                                         break
@@ -410,8 +470,12 @@ class PasswordManager:
                                                 print("Invalid input")
                                         
                                         encrypted_password = self._encrypt_password(new_password)
-                                        cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (encrypted_password, selected_id,))
-                                        connection.commit()
+                                        if encrypted_password:
+                                            cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (encrypted_password, selected_id,))
+                                            connection.commit()
+                                            print("Password updated successfully.")
+                                        else:
+                                            print("Failed to encrypt password. Password not updated.")
                                         break
                                     elif password_update_decision == "no":
                                         break
@@ -424,14 +488,16 @@ class PasswordManager:
                             print("No passwords stored yet.")  
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
+            
+            elif manager_process == "quit":
+                print("Goodbye!")
+                break
             else:
-                print("Choose 'view', 'add' or 'delete'")
-
+                print("Choose 'view', 'add', 'delete', 'update', or 'quit'")
 
 def main():
     manager = PasswordManager()
     manager.run()
-
 
 if __name__ == "__main__":
     main()
