@@ -4,6 +4,9 @@ import string
 import time
 import sqlite3
 import os
+from cryptography.fernet import Fernet
+import base64
+import hashlib
 
 # To-do
 # Change _encrypt_password to symmetric instead of hashing
@@ -13,12 +16,12 @@ class PasswordManager:
         self.master_hash = None
         self.master_salt = None
         self.is_authenticated = False
-        self.db_path = os.path.join(os.path.dirname(__file__), "password.db")
+        self.DB_PATH = os.path.join(os.path.dirname(__file__), "password.db")
     
     def _check_master_password_exists(self):
         """Check is a master password already exists in the database"""
         try:
-            with sqlite3.connect(self.db_path) as connection:
+            with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
 
                 # Create master_password table if it doesn't exist
@@ -46,14 +49,14 @@ class PasswordManager:
             return False
 
 
-    def _encrypt_master_password(self, password):
-        """Encrypt a password with bcrypt"""
+    def _hash_master_password(self, password):
+        """Hash master password with bcrypt"""
         salt = bcrypt.gensalt()
 
         try:
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
             
-            with sqlite3.connect(self.db_path) as connection:
+            with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
                 
                 # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
@@ -94,20 +97,31 @@ class PasswordManager:
         except UnicodeEncodeError:
             print("Encoding error. Please try again with valid characters.")
             return False
-        
+    
+
+    def _derive_key(self, password):
+        """Derive a symmetric encryption key from the master password"""
+        digest = hashlib.sha256(password.encode()).digest()
+        return base64.urlsafe_b64encode(digest)
+
 
     def _encrypt_password(self, password):
-        """Encrypt a password with bcrypt"""
-        salt = bcrypt.gensalt()
-
+        """Encrypt a password"""
         try:
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-            return hashed_password, salt
+            encrypted = self.fernet.encrypt(password.encode())
+            return encrypted
+        except Exception as e:
+            print(f"Encryption error: {e}")
+            return None
         
-        except UnicodeEncodeError:
-            print("Encoding error. Please try again with valid characters.")
-            return None, None
-        
+    def _decrypt_password(self, encrypted_password):
+        """Decrypt a password"""
+        try:
+            return self.fernet.decrypt(encrypted_password.encode()).decode()
+        except Exception as e:
+            print(f"Decryption error: {e}")
+            return None
+
 
     def authenticate(self):
         """Prompt for master password until correct"""
@@ -116,6 +130,7 @@ class PasswordManager:
             
             if self._verify_master_password(attempt):
                 print("Master password correct")
+                self.fernet = Fernet(self._derive_key(attempt))
                 self.is_authenticated = True
                 return True
             else:
@@ -140,7 +155,7 @@ class PasswordManager:
                 print("Invalid input")
         
         # Store the master password hash and salt
-        self.master_hash, self.master_salt = self._encrypt_master_password(password)
+        self.master_hash, self.master_salt = self._hash_master_password(password)
         
         # Authenticate with the new password
         self.authenticate()
@@ -209,7 +224,7 @@ class PasswordManager:
         if self.is_authenticated:
             print("Access granted to password database!")
 
-            with sqlite3.connect(self.db_path) as connection:
+            with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
                 
                 try:
@@ -218,8 +233,7 @@ class PasswordManager:
                         id INTEGER PRIMARY KEY,
                         website TEXT NOT NULL,
                         username TEXT NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        salt TEXT NOT NULL,
+                        password TEXT NOT NULL,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     )'''
 
@@ -234,7 +248,7 @@ class PasswordManager:
 
             # Select and then view a password from the database
             if manager_process == "view":
-                with sqlite3.connect(self.db_path) as connection:
+                with sqlite3.connect(self.DB_PATH) as connection:
                     cursor = connection.cursor()
                     
                     try:
@@ -252,11 +266,13 @@ class PasswordManager:
 
                             
                             # fix: change to print plain text password rather than hash
-                            cursor.execute("SELECT password_hash FROM passwords WHERE id = ?", (selected_id,))
+                            cursor.execute("SELECT password FROM passwords WHERE id = ?", (selected_id,))
                             result = cursor.fetchone()
                             
                             if result:
-                                print(f"\nPassword for entry ID {selected_id}: {result[0]}")
+                                decrypted = self._decrypt_password(result[0])
+                                print(f"\nPassword for entry ID {selected_id}: {decrypted}")
+
                             else:
                                 print("No password found for that ID.")
 
@@ -267,7 +283,7 @@ class PasswordManager:
                         print(f"Database error: {e}")
                         
             elif manager_process == "add":
-                with sqlite3.connect(self.db_path) as connection:
+                with sqlite3.connect(self.DB_PATH) as connection:
                     cursor = connection.cursor()
                     
                     try:
@@ -287,13 +303,13 @@ class PasswordManager:
                             else:
                                 print("Invalid input")
                         
-                        password_hash, salt = self._encrypt_password(password)
+                        encrypted_password = self._encrypt_password(password)
 
                         # Store the hashed password in database
                         cursor.execute('''INSERT OR REPLACE INTO passwords
-                                        (id, website, username, password_hash, salt) 
-                                        VALUES (NULL, ?, ?, ?, ?)''', 
-                                    (website, username, password_hash.decode('utf-8'), salt.decode('utf-8')))
+                                        (id, website, username, password) 
+                                        VALUES (NULL, ?, ?, ?)''', 
+                                    (website, username, encrypted_password.decode('utf-8')))
                         
                         connection.commit()
                         print("Password added successfully")
@@ -302,7 +318,7 @@ class PasswordManager:
                         print(f"Database error: {e}")
 
             elif manager_process == "delete":
-                with sqlite3.connect(self.db_path) as connection:
+                with sqlite3.connect(self.DB_PATH) as connection:
                     cursor = connection.cursor()
                     
                     try:
