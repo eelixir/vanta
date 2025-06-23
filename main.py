@@ -331,18 +331,27 @@ class PasswordManager:
                             
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to delete: ").strip()
-                
-                            cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
-                            website_result = cursor.fetchone()
-                            
-                            if website_result:
-                                website_name = website_result[0]
-                                # Proceed to delete after confirming it exists
-                                cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
-                                connection.commit()
-                                print(f"\nPassword for website '{website_name}' (ID: {selected_id}) has been deleted.")
-                            else:
-                                print("No password found for that ID.")
+
+                            while True:
+                                delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ")
+
+                                if delete_confirmation == "yes":
+                                    cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
+                                    website_result = cursor.fetchone()
+                                    
+                                    if website_result:
+                                        website_name = website_result[0]
+                                        # Proceed to delete after confirming it exists
+                                        cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
+                                        connection.commit()
+                                        print(f"\nPassword for website '{website_name}' (ID: {selected_id}) has been deleted.")
+                                    else:
+                                        print("No password found for that ID.")
+                                    break
+                                elif delete_confirmation == "no":
+                                    break
+                                else:
+                                    print("Invalid input. 'yes' or 'no' for password deletion.")
                         else:
                             print("No passwords stored yet.")
                     except sqlite3.Error as e:
