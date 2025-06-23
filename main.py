@@ -9,7 +9,6 @@ import base64
 import hashlib
 
 # To-do
-# Option to update password
 # Confirmation for deletion
 # Empty Inputs: check if required inputs (like website, username, or master password) are empty
 # GUI
@@ -240,7 +239,7 @@ class PasswordManager:
             print("Access granted to password database!")
 
         while True:
-            manager_process = input("Do you want to view, add or delete a password? (view/add/delete): ")
+            manager_process = input("Do you want to view, add, delete or update a password? (view/add/delete/update): ")
 
             # Select and then view a password from the database
             if manager_process == "view":
@@ -270,7 +269,7 @@ class PasswordManager:
                                 print("No password found for that ID.")
                         else:
                             print("No passwords stored yet.")
-                            
+
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
                         
@@ -325,7 +324,7 @@ class PasswordManager:
                             
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to delete: ").strip()
-                            
+                
                             cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
                             website_result = cursor.fetchone()
                             
@@ -339,11 +338,78 @@ class PasswordManager:
                                 print("No password found for that ID.")
                         else:
                             print("No passwords stored yet.")
+                    except sqlite3.Error as e:
+                        print(f"Database error: {e}")
+
+            elif manager_process == "update":
+                with sqlite3.connect(self.DB_PATH) as connection:
+                    cursor = connection.cursor()
+                    
+                    try:
+                        cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
+                        entries = cursor.fetchall()
+
+                        if entries:
+                            print("\nStored password entries:")
+                            print("-" * 50)
+                            for entry in entries:
+                                print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
                             
+                            print("-" * 50)
+                            selected_id = input("Enter the ID of the password you want to update: ").strip()
+
+                            cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
+                            website_result = cursor.fetchone()
+                            
+                            if website_result:
+                                website_name = website_result[0]
+
+                                while True:
+                                    username_update_decision = input("Do you want to update the username? (yes/no): ")
+                                    if username_update_decision == "yes":
+                                        new_username = input(f"Enter new username for {website_name}: ")
+                                        cursor.execute("UPDATE passwords SET username = ? WHERE id = ?", (new_username, selected_id,))
+                                        connection.commit()
+                                        break
+                                    elif username_update_decision == "no":
+                                        break
+                                    else:
+                                        print("Invalid input. Enter 'yes' or 'no' to update username.")
+                                        return False
+
+                                while True:
+                                    password_update_decision = input("Do you want to update the password? (yes/no): ")
+                                    if password_update_decision == "yes":
+                                        while True:
+                                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ")
+                                           
+                                            if choice == "create":
+                                                new_password = self._get_user_password()
+                                                break
+                                            elif choice == "generate":
+                                                new_password = self._generate_password()
+                                                print(f"This is the generated password for {website_name}: {new_password}")
+                                                break
+                                            else:
+                                                print("Invalid input")
+                                        
+                                        encrypted_password = self._encrypt_password(new_password)
+                                        cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (encrypted_password.decode('utf-8'), selected_id,))
+                                        connection.commit()
+                                        break
+                                    elif password_update_decision == "no":
+                                        break
+                                    else:
+                                        print("Invalid input. Enter 'yes' or 'no' to update password.")
+                            else:
+                                print("No password found for that ID.")
+                        else:
+                            print("No passwords stored yet.")  
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
             else:
                 print("Choose 'view', 'add' or 'delete'")
+
 
 def main():
     manager = PasswordManager()
