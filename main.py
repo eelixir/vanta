@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives import hashes
 import base64
 
 # To-do
+# Break down run logic ("view", "add", etc.) into seperate methods (_handle_view(), _handle_add())
 # Encrypt the entire database using SQLCipher
 # Web UI with Flask
 
@@ -174,7 +175,7 @@ class PasswordManager:
     def authenticate(self):
         """Prompt for master password until correct"""
         while not self.is_authenticated:
-            attempt = input("Enter master password: ")
+            attempt = input("Enter master password: ").strip()
             
             if self._verify_master_password(attempt):
                 print("Master password correct")
@@ -189,7 +190,7 @@ class PasswordManager:
     def create_master_password(self):
         """Create or generate a new master password"""
         while True:
-            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ").strip()
             
             if choice == "create":
                 password = self._get_user_password()
@@ -214,7 +215,7 @@ class PasswordManager:
         prompt = "Create password: " if self._check_master_password_exists() else "Create master password: "
         
         while True:
-            password = input(prompt)
+            password = input(prompt).strip()
             if self._check_complexity(password):
                 print("Password created successfully.")
                 return password
@@ -277,7 +278,7 @@ class PasswordManager:
             print("Access granted to password database!")
 
         while True:
-            manager_process = input("Do you want to view, add, delete, update a password, or quit? (view/add/delete/update/quit): ")
+            manager_process = input("Do you want to view, add, delete, update a password, or quit? (view/add/delete/update/quit): ").strip()
 
             # Select and then view a password from the database
             if manager_process == "view":
@@ -334,7 +335,7 @@ class PasswordManager:
                                 break
 
                         while True:
-                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ")
+                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ").strip()
                             
                             if choice == "create":
                                 password = self._get_user_password()
@@ -386,7 +387,7 @@ class PasswordManager:
                                 if not self._validate_input(selected_id, "ID"):
                                     continue
 
-                                delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ")
+                                delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ").strip()
 
                                 if delete_confirmation == "yes":
                                     cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
@@ -437,7 +438,7 @@ class PasswordManager:
                                 website_name = website_result[0]
 
                                 while True:
-                                    username_update_decision = input("Do you want to update the username? (yes/no): ")
+                                    username_update_decision = input("Do you want to update the username? (yes/no): ").strip()
                                     if username_update_decision == "yes":
                                         while True:
                                             new_username = input(f"Enter new username for {website_name}: ").strip()
@@ -454,10 +455,10 @@ class PasswordManager:
                                         continue
 
                                 while True:
-                                    password_update_decision = input("Do you want to update the password? (yes/no): ")
+                                    password_update_decision = input("Do you want to update the password? (yes/no): ").strip()
                                     if password_update_decision == "yes":
                                         while True:
-                                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ")
+                                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ").strip()
                                            
                                             if choice == "create":
                                                 new_password = self._get_user_password()
