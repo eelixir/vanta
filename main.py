@@ -9,6 +9,9 @@ import base64
 import hashlib
 
 # To-do
+# Option to update password
+# Confirmation for deletion
+# Empty Inputs: check if required inputs (like website, username, or master password) are empty
 # GUI
 
 class PasswordManager:
@@ -17,14 +20,16 @@ class PasswordManager:
         self.master_salt = None
         self.is_authenticated = False
         self.DB_PATH = os.path.join(os.path.dirname(__file__), "password.db")
-    
-    def _check_master_password_exists(self):
-        """Check is a master password already exists in the database"""
+        self._initialize_database() 
+
+
+    def _initialize_database(self):
+        """Initialize database with all required tables"""
         try:
             with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
 
-                # Create master_password table if it doesn't exist
+                # Create master_password table
                 master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
                     id INTEGER PRIMARY KEY,
                     password_hash TEXT NOT NULL,
@@ -32,6 +37,27 @@ class PasswordManager:
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )'''
                 cursor.execute(master_password_table)
+
+                # Create passwords table
+                password_table = '''CREATE TABLE IF NOT EXISTS passwords (
+                    id INTEGER PRIMARY KEY,
+                    website TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    password TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )'''
+                cursor.execute(password_table)
+
+                connection.commit()
+                
+        except sqlite3.Error as e:
+            print(f"Database initialization error: {e}")
+
+    def _check_master_password_exists(self):
+        """Check if a master password already exists in the database"""
+        try:
+            with sqlite3.connect(self.DB_PATH) as connection:
+                cursor = connection.cursor()
 
                 # Check if master password exists
                 cursor.execute("SELECT password_hash, salt FROM master_password WHERE id = 1")
@@ -48,7 +74,6 @@ class PasswordManager:
             print(f"Database error: {e}")
             return False
 
-
     def _hash_master_password(self, password):
         """Hash master password with bcrypt"""
         salt = bcrypt.gensalt()
@@ -59,17 +84,7 @@ class PasswordManager:
             with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
                 
-                # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
-                master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
-                    id INTEGER PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )'''
-
-                cursor.execute(master_password_table)
-                
-                # Store the hashed password in database
+                # Store the hashed password in database 
                 cursor.execute('''INSERT OR REPLACE INTO master_password 
                                 (id, password_hash, salt) 
                                 VALUES (1, ?, ?)''', 
@@ -213,37 +228,16 @@ class PasswordManager:
         """Main application loop"""
         print("Welcome to Password Manager")
 
-        # Check is master password already exists
+        # Check if master password already exists
         if self._check_master_password_exists():
             print("Master password found. Please authenticate.")
             self.authenticate()
-
         else:
             print("No master password found. Please create one.")
             self.create_master_password()
         
-        
         if self.is_authenticated:
             print("Access granted to password database!")
-
-            with sqlite3.connect(self.DB_PATH) as connection:
-                cursor = connection.cursor()
-                
-                try:
-                    # Create table if it doesn't exist (will fail if table already exists without IF NOT EXISTS)
-                    password_table = '''CREATE TABLE IF NOT EXISTS passwords (
-                        id INTEGER PRIMARY KEY,
-                        website TEXT NOT NULL,
-                        username TEXT NOT NULL,
-                        password TEXT NOT NULL,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )'''
-
-                    cursor.execute(password_table)
-                    connection.commit()
-
-                except sqlite3.Error as e:
-                    print(f"Database error: {e}")
 
         while True:
             manager_process = input("Do you want to view, add or delete a password? (view/add/delete): ")
@@ -266,18 +260,14 @@ class PasswordManager:
                             print("-" * 50)
                             selected_id = input("Enter the ID of the password you want to view: ").strip()
 
-                            
-                            # fix: change to print plain text password rather than hash
                             cursor.execute("SELECT password FROM passwords WHERE id = ?", (selected_id,))
                             result = cursor.fetchone()
                             
                             if result:
                                 decrypted = self._decrypt_password(result[0])
                                 print(f"\nPassword for entry ID {selected_id}: {decrypted}")
-
                             else:
                                 print("No password found for that ID.")
-
                         else:
                             print("No passwords stored yet.")
                             
@@ -289,28 +279,28 @@ class PasswordManager:
                     cursor = connection.cursor()
                     
                     try:
-                        website = input ("Enter website: ")
+                        website = input("Enter website: ")
                         username = input("Enter username: ")
 
                         while True:
-                            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ")
+                            choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ")
                             
                             if choice == "create":
                                 password = self._get_user_password()
                                 break
                             elif choice == "generate":
                                 password = self._generate_password()
-                                print(f"This is your password: {password}")
+                                print(f"This is the generated password for {website}: {password}")
                                 break
                             else:
                                 print("Invalid input")
                         
                         encrypted_password = self._encrypt_password(password)
 
-                        # Store the hashed password in database
-                        cursor.execute('''INSERT OR REPLACE INTO passwords
-                                        (id, website, username, password) 
-                                        VALUES (NULL, ?, ?, ?)''', 
+                        # Store the encrypted password in database
+                        cursor.execute('''INSERT INTO passwords
+                                        (website, username, password) 
+                                        VALUES (?, ?, ?)''', 
                                     (website, username, encrypted_password.decode('utf-8')))
                         
                         connection.commit()
@@ -343,16 +333,15 @@ class PasswordManager:
                                 website_name = website_result[0]
                                 # Proceed to delete after confirming it exists
                                 cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
+                                connection.commit()
                                 print(f"\nPassword for website '{website_name}' (ID: {selected_id}) has been deleted.")
                             else:
                                 print("No password found for that ID.")
-
                         else:
                             print("No passwords stored yet.")
                             
                     except sqlite3.Error as e:
                         print(f"Database error: {e}")
-
             else:
                 print("Choose 'view', 'add' or 'delete'")
 
