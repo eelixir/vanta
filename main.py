@@ -9,7 +9,7 @@ import base64
 import hashlib
 
 # To-do
-# Change _encrypt_password to symmetric instead of hashing
+# GUI
 
 class PasswordManager:
     def __init__(self):
@@ -163,8 +163,10 @@ class PasswordManager:
 
     def _get_user_password(self):
         """Get a user-created password that meets complexity requirements"""
+        prompt = "Create password: " if self._check_master_password_exists() else "Create master password: "
+        
         while True:
-            password = input("Create master password: ")
+            password = input(prompt)
             if self._check_complexity(password):
                 print("Password created successfully.")
                 return password
