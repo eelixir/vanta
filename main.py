@@ -5,6 +5,8 @@ import time
 import sqlite3
 import os
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 import base64
 import hashlib
 
@@ -114,24 +116,29 @@ class PasswordManager:
     
 
     def _derive_key(self, password):
-        """Derive a symmetric encryption key from the master password"""
-        digest = hashlib.sha256(password.encode()).digest()
-        return base64.urlsafe_b64encode(digest)
+        kdf = PBKDF2HMAC(
+            algorithm = hashes.SHA256(),
+            length = 32,
+            salt = self.master_salt,
+            iterations = 100000
+        )
+        return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
 
     def _encrypt_password(self, password):
         """Encrypt a password"""
         try:
             encrypted = self.fernet.encrypt(password.encode())
-            return encrypted
+            return base64.b64encode(encrypted).decode('utf-8')
         except Exception as e:
             print(f"Encryption error: {e}")
             return None
         
-    def _decrypt_password(self, encrypted_password):
+    def _decrypt_password(self, encrypted_password_b64):
         """Decrypt a password"""
         try:
-            return self.fernet.decrypt(encrypted_password.encode()).decode()
+            encrypted_bytes = base64.b64decode(encrypted_password_b64.encode('utf-8'))
+            return self.fernet.decrypt(encrypted_bytes).decode()        
         except Exception as e:
             print(f"Decryption error: {e}")
             return None
@@ -300,7 +307,7 @@ class PasswordManager:
                         cursor.execute('''INSERT INTO passwords
                                         (website, username, password) 
                                         VALUES (?, ?, ?)''', 
-                                    (website, username, encrypted_password.decode('utf-8')))
+                                    (website, username, encrypted_password))
                         
                         connection.commit()
                         print("Password added successfully")
@@ -375,7 +382,7 @@ class PasswordManager:
                                         break
                                     else:
                                         print("Invalid input. Enter 'yes' or 'no' to update username.")
-                                        return False
+                                        continue
 
                                 while True:
                                     password_update_decision = input("Do you want to update the password? (yes/no): ")
@@ -394,13 +401,14 @@ class PasswordManager:
                                                 print("Invalid input")
                                         
                                         encrypted_password = self._encrypt_password(new_password)
-                                        cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (encrypted_password.decode('utf-8'), selected_id,))
+                                        cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (encrypted_password, selected_id,))
                                         connection.commit()
                                         break
                                     elif password_update_decision == "no":
                                         break
                                     else:
                                         print("Invalid input. Enter 'yes' or 'no' to update password.")
+                                        continue
                             else:
                                 print("No password found for that ID.")
                         else:
