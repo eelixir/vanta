@@ -11,6 +11,7 @@ import base64
 
 # To-do
 # Encrypt the entire database using SQLCipher
+# Unit testing
 # Web UI with Flask
 
 class PasswordManager:
@@ -280,7 +281,7 @@ class PasswordManager:
                     selected_id = input("Enter the ID of the password you want to view: ").strip()
 
                     if not self._validate_input(selected_id, "ID"):
-                        pass
+                        return
 
                     cursor.execute("SELECT password FROM passwords WHERE id = ?", (selected_id,))
                     result = cursor.fetchone()
