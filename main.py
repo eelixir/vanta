@@ -228,25 +228,25 @@ class PasswordManager:
                 self.is_authenticated = True
                 return True
             else:
-                print("Master password incorrect")
-                print("Try again in 5 seconds")
+                print("Incorrect master password. Access denied.")
+                print("Try again in 5 seconds...\n")
                 time.sleep(5)
 
     def create_master_password(self):
         """Create or generate a new master password"""
         while True:
-            choice = input("Would you like to create your own master password or have us create one for you? Enter 'create' or 'generate': ").strip()
+            choice = input("Would you like to create your own master password or have us create one for you? (create/generate): ").strip()
             
             if choice == "create":
                 password = self._get_user_password()
                 break
             elif choice == "generate":
                 password = self._generate_password()
-                print(f"Generated master password: {password}")
-                print("Store this securely - you won't see it again!")
+                print(f"\nGenerated master password: {password}")
+                print("Store this securely - you won't see it again!\n")
                 break
             else:
-                print("Invalid input")
+                print("Invalid input. Enter 'create' or 'generate'.")
         
         # Store the master password hash and salt
         self.master_hash, self.master_salt = self._hash_master_password(password)
@@ -272,7 +272,7 @@ class PasswordManager:
                 entries = cursor.fetchall()
                 
                 if entries:
-                    print("\nStored password entries:")
+                    print("Stored password entries:")
                     print("-" * 50)
                     for entry in entries:
                         print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
@@ -289,7 +289,7 @@ class PasswordManager:
                     if result:
                         decrypted = self._decrypt_password(result[0])
                         if decrypted:
-                            print(f"\nPassword for entry ID {selected_id}: {decrypted}")
+                            print(f"Password for entry ID {selected_id}: {decrypted}")
                         else:
                             print("Failed to decrypt password.")
                     else:
@@ -318,7 +318,7 @@ class PasswordManager:
                         break
 
                 while True:
-                    choice = input("Would you like to create your own password or have us create one for you? Enter 'create' or 'generate': ").strip()
+                    choice = input("Would you like to create your own password or have us create one for you? (create/generate): ").strip()
                     
                     if choice == "create":
                         password = self._get_user_password()
@@ -328,7 +328,7 @@ class PasswordManager:
                         print(f"This is the generated password for {website}: {password}")
                         break
                     else:
-                        print("Invalid input")
+                        print("Invalid input. Enter 'create' or 'generate'.")
                 
                 encrypted_password = self._encrypt_password(password)
                 if not encrypted_password:
@@ -347,54 +347,6 @@ class PasswordManager:
             except sqlite3.Error as e:
                 print(f"Database error: {e}")
 
-    def _handle_delete(self):
-        """Delete a password from the database"""
-        with sqlite3.connect(self.DB_PATH) as connection:
-            cursor = connection.cursor()
-            
-            try:
-                cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
-                entries = cursor.fetchall()
-                
-                if entries:
-                    print("\nStored password entries:")
-                    print("-" * 50)
-                    for entry in entries:
-                        print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
-                    
-                    print("-" * 50)
-
-                    while True:
-
-                        selected_id = input("Enter the ID of the password you want to delete: ").strip()
-
-                        if not self._validate_input(selected_id, "ID"):
-                            continue
-
-                        delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ").strip()
-
-                        if delete_confirmation == "yes":
-                            cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
-                            website_result = cursor.fetchone()
-                            
-                            if website_result:
-                                website_name = website_result[0]
-                                # Proceed to delete after confirming it exists
-                                cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
-                                connection.commit()
-                                print(f"\nPassword for website '{website_name}' (ID: {selected_id}) has been deleted.")
-                            else:
-                                print("No password found for that ID.")
-                            break
-                        elif delete_confirmation == "no":
-                            break
-                        else:
-                            print("Invalid input. 'yes' or 'no' for password deletion.")
-                else:
-                    print("No passwords stored yet.")
-            except sqlite3.Error as e:
-                print(f"Database error: {e}")
-
     def _handle_update(self):
         """Update a password from the database"""
         with sqlite3.connect(self.DB_PATH) as connection:
@@ -405,7 +357,7 @@ class PasswordManager:
                 entries = cursor.fetchall()
 
                 if entries:
-                    print("\nStored password entries:")
+                    print("Stored password entries:")
                     print("-" * 50)
                     for entry in entries:
                         print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
@@ -453,7 +405,7 @@ class PasswordManager:
                                         print(f"This is the generated password for {website_name}: {new_password}")
                                         break
                                     else:
-                                        print("Invalid input")
+                                        print("Invalid input. Enter 'create' or 'generate'.")
                                 
                                 encrypted_password = self._encrypt_password(new_password)
                                 if encrypted_password:
@@ -474,14 +426,61 @@ class PasswordManager:
                     print("No passwords stored yet.")  
             except sqlite3.Error as e:
                 print(f"Database error: {e}")
+                
+    def _handle_delete(self):
+        """Delete a password from the database"""
+        with sqlite3.connect(self.DB_PATH) as connection:
+            cursor = connection.cursor()
+            
+            try:
+                cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
+                entries = cursor.fetchall()
+                
+                if entries:
+                    print("Stored password entries:")
+                    print("-" * 50)
+                    for entry in entries:
+                        print(f"ID: {entry[0]} | Website: {entry[1]} | Username: {entry[2]} | Created: {entry[3]}")
+                    
+                    print("-" * 50)
+
+                    while True:
+
+                        selected_id = input("Enter the ID of the password you want to delete: ").strip()
+
+                        if not self._validate_input(selected_id, "ID"):
+                            continue
+
+                        delete_confirmation = input(f"Are you sure you want to delete ID: {selected_id}? (yes/no): ").strip()
+
+                        if delete_confirmation == "yes":
+                            cursor.execute("SELECT website FROM passwords WHERE id = ?", (selected_id,))
+                            website_result = cursor.fetchone()
+                            
+                            if website_result:
+                                website_name = website_result[0]
+                                # Proceed to delete after confirming it exists
+                                cursor.execute("DELETE FROM passwords WHERE id = ?", (selected_id,))
+                                connection.commit()
+                                print(f"Password for website '{website_name}' (ID: {selected_id}) has been deleted.")
+                            else:
+                                print("No password found for that ID.")
+                            break
+                        elif delete_confirmation == "no":
+                            break
+                        else:
+                            print("Invalid input. 'yes' or 'no' for password deletion.")
+                else:
+                    print("No passwords stored yet.")
+            except sqlite3.Error as e:
+                print(f"Database error: {e}")
 
     def run(self):
         """Main application loop"""
-        print("Welcome to Password Manager")
+        print("Welcome to Vanta Password Manager\n")
 
         # Check if master password already exists
         if self._check_master_password_exists():
-            print("Master password found. Please authenticate.")
             self.authenticate()
         else:
             print("No master password found. Please create one.")
@@ -491,7 +490,7 @@ class PasswordManager:
             print("Access granted to password database!")
 
         while True:
-            manager_process = input("Do you want to view, add, delete, update a password, or quit? (view/add/delete/update/quit): ").strip()
+            manager_process = input("\nDo you want to view, add, delete, update a password, or quit? (view/add/update/delete/quit): ").strip()
 
             # Select and then view a password from the database
             if manager_process == "view":
@@ -500,11 +499,11 @@ class PasswordManager:
             elif manager_process == "add":
                 self._handle_add()
 
-            elif manager_process == "delete":
-                self._handle_delete()
-
             elif manager_process == "update":
                 self._handle_update()
+
+            elif manager_process == "delete":
+                self._handle_delete()
             
             elif manager_process == "quit":
                 print("Goodbye!")
