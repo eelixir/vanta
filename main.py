@@ -90,6 +90,51 @@ class PasswordManager:
         except sqlite3.Error as e:
             print(f"Database error: {e}")
             return False
+        
+    def _generate_password(self, length=16):
+        """Generate a random password"""
+        chars = string.ascii_letters + string.digits + string.punctuation
+        return ''.join(secrets.choice(chars) for _ in range(length))
+    
+    def _check_complexity(self, password):
+        """Check if password meets complexity requirements"""
+        valid = True
+        requirements = []
+        
+        if len(password) < 12:
+            requirements.append("at least 12 characters")
+            valid = False
+        
+        if not any(c.isupper() for c in password):
+            requirements.append("uppercase letters")
+            valid = False
+        
+        if not any(c.islower() for c in password):
+            requirements.append("lowercase letters")
+            valid = False
+        
+        if not any(c.isdigit() for c in password):
+            requirements.append("digits")
+            valid = False
+        
+        if not any(c in string.punctuation for c in password):
+            requirements.append("symbols")
+            valid = False
+        
+        if not valid:
+            print(f"Password must contain: {', '.join(requirements)}")
+        
+        return valid
+    
+    def _get_user_password(self):
+        """Get a user-created password that meets complexity requirements"""
+        prompt = "Create password: " if self._check_master_password_exists() else "Create master password: "
+        
+        while True:
+            password = input(prompt).strip()
+            if self._check_complexity(password):
+                print("Password created successfully.")
+                return password
 
     def _hash_master_password(self, password):
         """Hash master password with bcrypt"""
@@ -209,51 +254,6 @@ class PasswordManager:
         # Initialize encryption with the new password
         self.fernet = Fernet(self._derive_key(password))
         self.authenticate()
-
-    def _get_user_password(self):
-        """Get a user-created password that meets complexity requirements"""
-        prompt = "Create password: " if self._check_master_password_exists() else "Create master password: "
-        
-        while True:
-            password = input(prompt).strip()
-            if self._check_complexity(password):
-                print("Password created successfully.")
-                return password
-
-    def _generate_password(self, length=16):
-        """Generate a random password"""
-        chars = string.ascii_letters + string.digits + string.punctuation
-        return ''.join(secrets.choice(chars) for _ in range(length))
-
-    def _check_complexity(self, password):
-        """Check if password meets complexity requirements"""
-        valid = True
-        requirements = []
-        
-        if len(password) < 12:
-            requirements.append("at least 12 characters")
-            valid = False
-        
-        if not any(c.isupper() for c in password):
-            requirements.append("uppercase letters")
-            valid = False
-        
-        if not any(c.islower() for c in password):
-            requirements.append("lowercase letters")
-            valid = False
-        
-        if not any(c.isdigit() for c in password):
-            requirements.append("digits")
-            valid = False
-        
-        if not any(c in string.punctuation for c in password):
-            requirements.append("symbols")
-            valid = False
-        
-        if not valid:
-            print(f"Password must contain: {', '.join(requirements)}")
-        
-        return valid
 
     def _validate_input(self, value, field_name):
         """Validate that input is not empty"""
