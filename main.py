@@ -10,14 +10,12 @@ from cryptography.hazmat.primitives import hashes
 import base64
 
 # To-do
-# Encrypt the entire database using SQLCipher
 # Unit testing
 # Web UI with Flask
 
 class PasswordManager:
     def __init__(self):
         self.master_hash = None
-        self.master_salt = None
         self.is_authenticated = False
         self.fernet = None  
         self.DB_PATH = os.path.join(os.path.dirname(__file__), "password.db")
@@ -49,8 +47,7 @@ class PasswordManager:
                 # Create master_password table
                 master_password_table = '''CREATE TABLE IF NOT EXISTS master_password (
                     id INTEGER PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    salt TEXT NOT NULL,
+                    password_hash BLOB NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )'''
                 cursor.execute(master_password_table)
@@ -77,12 +74,11 @@ class PasswordManager:
                 cursor = connection.cursor()
 
                 # Check if master password exists
-                cursor.execute("SELECT password_hash, salt FROM master_password WHERE id = 1")
+                cursor.execute("SELECT password_hash FROM master_password WHERE id = 1")
                 result = cursor.fetchone()
 
                 if result:
-                    self.master_hash = result[0].encode('utf-8')
-                    self.master_salt = result[1].encode('utf-8')
+                    self.master_hash = result[0]
                     return True
                 else:
                     return False
@@ -138,27 +134,25 @@ class PasswordManager:
 
     def _hash_master_password(self, password):
         """Hash master password with bcrypt"""
-        salt = bcrypt.gensalt()
-
         try:
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
             
             with sqlite3.connect(self.DB_PATH) as connection:
                 cursor = connection.cursor()
                 
                 # Store the hashed password in database 
                 cursor.execute('''INSERT OR REPLACE INTO master_password 
-                                (id, password_hash, salt) 
-                                VALUES (1, ?, ?)''', 
-                            (hashed_password.decode('utf-8'), salt.decode('utf-8')))
+                                (id, password_hash) 
+                                VALUES (1, ?)''', 
+                            (hashed_password,))
                 
                 connection.commit()       
                      
-            return hashed_password, salt
+            return hashed_password
 
         except sqlite3.Error as e:
             print(f"Database error: {e}")
-            return None, None
+            return None
         
         except UnicodeEncodeError:
             print("Encoding error. Please try again with valid characters.")
@@ -167,8 +161,7 @@ class PasswordManager:
     def _verify_master_password(self, attempt):
         """Verify an attempted master password"""
         try:
-            hashed_attempt = bcrypt.hashpw(attempt.encode('utf-8'), self.master_salt)
-            return secrets.compare_digest(hashed_attempt, self.master_hash)
+            return bcrypt.checkpw(attempt.encode('utf-8'), self.master_hash)
         
         except UnicodeEncodeError:
             print("Encoding error. Please try again with valid characters.")
@@ -249,7 +242,7 @@ class PasswordManager:
                 print("Invalid input. Enter 'create' or 'generate'.")
         
         # Store the master password hash and salt
-        self.master_hash, self.master_salt = self._hash_master_password(password)
+        self.master_hash= self._hash_master_password(password)
         
         # Initialize encryption with the new password
         self.fernet = Fernet(self._derive_key(password))
