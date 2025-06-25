@@ -10,7 +10,9 @@ from cryptography.hazmat.primitives import hashes
 import base64
 
 # To-do
-# Unit testing
+# Category / Tags
+# Export / import functionality
+# Change to simple command parsing (using argparse or click) ???
 # Web UI with Flask
 
 class PasswordManager:
