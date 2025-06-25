@@ -10,9 +10,9 @@ from cryptography.hazmat.primitives import hashes
 import base64
 
 # To-do
+# Change to simple command parsing (using argparse or click)
 # Category / Tags
 # Export / import functionality
-# Change to simple command parsing (using argparse or click) ???
 # Web UI with Flask
 
 class PasswordManager:
@@ -20,7 +20,7 @@ class PasswordManager:
         self.master_hash = None
         self.is_authenticated = False
         self.fernet = None  
-        self.DB_PATH = os.path.join(os.path.dirname(__file__), "password.db")
+        self.DB_PATH = os.path.join(os.path.dirname(__file__), "vault.db")
         self._initialize_database() 
 
     def _initialize_database(self):
