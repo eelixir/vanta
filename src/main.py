@@ -21,6 +21,7 @@ import platform
 
 class PasswordManager:
     def __init__(self):
+        self.version = "0.1.1"
         self.console = Console()
         self.master_hash = None
         self.is_authenticated = False
@@ -286,25 +287,25 @@ class PasswordManager:
                 self.is_authenticated = True
                 return True
             else:
-                print("Incorrect master password. Access denied.")
+                self.console.print("Incorrect master password. Access denied.", style="red")
                 print("Try again in 5 seconds...\n")
                 time.sleep(5)
 
     def create_master_password(self):
         """Create or generate a new master password"""
         while True:
-            choice = self.console.input("[yellow]> [/yellow]Would you like to create your own master password or have us create one for you? (create/generate): ").strip()
+            choice = self.console.input("[yellow]> [/yellow]Choose master password method - /create to type your own, /generate for a random one: ").strip()
             
-            if choice == "create":
+            if choice == "/create" or choice == "/c":
                 password = self._get_user_password()
                 break
-            elif choice == "generate":
+            elif choice == "/generate" or choice == "/g":
                 password = self._generate_password()
                 print(f"\nGenerated master password: {password}")
                 print("Store this securely - you won't see it again!\n")
                 break
             else:
-                self.console.print("Invalid input. Enter 'create' or 'generate'", style="red")
+                self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
         
         # Store the master password hash and salt
         self.master_hash= self._hash_master_password(password)
@@ -383,17 +384,17 @@ class PasswordManager:
                         break
 
                 while True:
-                    choice = self.console.input("[yellow]> [/yellow]Would you like to create your own password or have us create one for you? (create/generate): ").strip()
+                    choice = self.console.input("[yellow]> [/yellow]Choose password method - /create to type your own, /generate for a random one: ").strip()
                     
-                    if choice == "create":
+                    if choice == "/create" or choice == "/c":
                         password = self._get_user_password()
                         break
-                    elif choice == "generate":
+                    elif choice == "/generate" or choice == "/g":
                         password = self._generate_password()
                         print(f"This is the generated password for {website}: {password}")
                         break
                     else:
-                        print("Invalid input. Enter 'create' or 'generate'.")
+                        self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
                 
                 encrypted_password = self._encrypt_password(password)
                 if not encrypted_password:
@@ -459,24 +460,24 @@ class PasswordManager:
                             elif username_update_decision == "no":
                                 break
                             else:
-                                print("Invalid input. Enter 'yes' or 'no' to update username.")
+                                self.console.print("Invalid input. Enter 'yes' or 'no' to update username.", style="red")
                                 continue
 
                         while True:
                             password_update_decision = self.console.input("[yellow]> [/yellow]Do you want to update the password? (yes/no): ").strip()
                             if password_update_decision == "yes":
                                 while True:
-                                    choice = self.console.input("[yellow]> [/yellow]Would you like to create your own password or have us create one for you? Enter (create/generate): ").strip()
+                                    choice = self.console.input("[yellow]> [/yellow]Choose password method - /create to type your own, /generate for a random one: ").strip()
                                 
-                                    if choice == "create":
+                                    if choice == "/create" or choice == "/c":
                                         new_password = self._get_user_password()
                                         break
-                                    elif choice == "generate":
+                                    elif choice == "generate" or choice == "/g":
                                         new_password = self._generate_password()
                                         print(f"This is the generated password for {website_name}: {new_password}")
                                         break
                                     else:
-                                        print("Invalid input. Enter 'create' or 'generate'.")
+                                        self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
                                 
                                 encrypted_password = self._encrypt_password(new_password)
                                 if encrypted_password:
@@ -489,7 +490,7 @@ class PasswordManager:
                             elif password_update_decision == "no":
                                 break
                             else:
-                                print("Invalid input. Enter 'yes' or 'no' to update password.")
+                                self.console.print("Invalid input. Enter 'yes' or 'no' to update password.", style="red")
                                 continue
                             
                         print(f"Update for ID {selected_id} complete.\n")
@@ -548,7 +549,7 @@ class PasswordManager:
                         elif delete_confirmation == "n":
                             break
                         else:
-                            print("Invalid input. 'yes' or 'no' for password deletion.")
+                            self.console.print("Invalid input. 'yes' or 'no' for password deletion.", style="red")
                 else:
                     print("No passwords stored yet.\n")
             except sqlite3.Error as e:
@@ -561,7 +562,7 @@ class PasswordManager:
         header = Text()
         header.append("vanta", style="bold white")
         header.append("\n")
-        header.append("v0.1.0", style="dim white")
+        header.append(f"v{self.version}", style="dim white")
         
         console.print()
         console.print(Align.center(header))
@@ -579,6 +580,7 @@ class PasswordManager:
         
         commands = [
             ("/help", "show help", "/h"),
+            ("/info", "version details", "/i"),
             ("/view", "view passwords", "/v"),
             ("/add", "add password", "/a"),
             ("/update", "update password", "/u"),
@@ -592,6 +594,19 @@ class PasswordManager:
         print("")
         console.print(Align.center(table))
         console.print()
+
+    def show_info(self):
+        console = Console()
+        font = """ 
+██    ██  █████  ███    ██ ████████  █████  
+██    ██ ██   ██ ████   ██    ██    ██   ██ 
+██    ██ ███████ ██ ██  ██    ██    ███████ 
+ ██  ██  ██   ██ ██  ██ ██    ██    ██   ██ 
+  ████   ██   ██ ██   ████    ██    ██   ██                                            
+"""
+        print(font)
+        self.console.print(f"Version: {self.version}", style="cyan")
+        console.print("Repo: [link=https://github.com/eelixir/vanta]github.com/elixir/vanta[/link]\n", style="cyan")
 
     def run(self):
         """Main application loop"""
@@ -617,6 +632,9 @@ class PasswordManager:
             # Select and then view a password from the database
             if manager_process == "/help" or manager_process == "/h":
                 self.show_help()
+
+            if manager_process == "/info" or manager_process == "/i":
+                self.show_info()
 
             elif manager_process == "/view" or manager_process == "/v":
                 self._handle_view()
