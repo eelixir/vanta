@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
-import sys
+import platform
 
 # To-do
 # Add ability to go back at anytime
@@ -25,16 +25,67 @@ class PasswordManager:
         self.master_hash = None
         self.is_authenticated = False
         self.fernet = None  
-
-        if getattr(sys, 'frozen', False):
-            # Running as compiled executable
-            self.DB_PATH = os.path.join(os.path.dirname(sys.executable), "vault.db")
-        else:
-            # Running as Python script
-            self.DB_PATH = os.path.join(os.path.dirname(__file__), "vault.db")        
+        self.DB_PATH = self._get_database_path()
         
         self._initialize_database() 
 
+    def _get_database_path(self):
+        """Get platform-appropriate database path"""
+        app_name = "Vanta"
+        db_filename = "vault.db"
+        
+        system = platform.system()
+        
+        if system == "Windows":
+            try:
+                documents_path = os.path.expanduser('~/Documents')
+                if os.path.exists(documents_path) and os.access(documents_path, os.W_OK):
+                    base_path = documents_path
+                else:
+                    raise OSError("Documents folder not accessible")
+            except OSError:
+                try:
+                    user_profile = os.environ.get('USERPROFILE')
+                    if user_profile:
+                        base_path = os.path.join(user_profile, 'AppData', 'Roaming')
+                    else:
+                        base_path = os.path.expanduser('~\\AppData\\Roaming')
+                    
+                    if not os.access(base_path, os.W_OK):
+                        raise OSError("AppData not writable")
+                        
+                except OSError:
+                    print("Warning: Using current directory for database storage")
+                    return os.path.join(os.getcwd(), db_filename)
+                    
+        elif system == "Darwin":  # macOS
+            base_path = os.path.expanduser('~/Library/Application Support')
+        else:  # Linux and other Unix-like systems
+            base_path = os.environ.get('XDG_DATA_HOME')
+            if not base_path:
+                base_path = os.path.expanduser('~/.local/share')
+        
+        app_dir = os.path.join(base_path, app_name)
+        
+        try:
+            os.makedirs(app_dir, exist_ok=True)
+            
+            test_file = os.path.join(app_dir, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+            except OSError:
+                raise OSError("Cannot write to app directory")
+                
+        except OSError as e:
+            print(f"Warning: Could not create app directory {app_dir}: {e}")
+            fallback_path = os.path.join(os.getcwd(), db_filename)
+            print(f"Using fallback location: {fallback_path}")
+            return fallback_path
+        
+        return os.path.join(app_dir, db_filename)
+    
     def _initialize_database(self):
         """Initialize database with all required tables"""
         try:
@@ -79,7 +130,7 @@ class PasswordManager:
                 connection.commit()
                 
         except sqlite3.Error as e:
-            print(f"Database initialization error: {e}")
+            print(f"Database initialization error: {e}\n")
 
     def _check_master_password_exists(self):
         """Check if a master password already exists in the database"""
@@ -98,7 +149,7 @@ class PasswordManager:
                     return False
                 
         except sqlite3.Error as e:
-            print(f"Database error: {e}")
+            print(f"Database error: {e}\n")
             return False
         
     def _generate_password(self, length=16):
@@ -165,7 +216,7 @@ class PasswordManager:
             return hashed_password
 
         except sqlite3.Error as e:
-            print(f"Database error: {e}")
+            print(f"Database error: {e}\n")
             return None
         
         except UnicodeEncodeError:
