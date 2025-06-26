@@ -1,3 +1,4 @@
 bcrypt
 cryptography
 rich
+pytest
