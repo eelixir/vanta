@@ -21,7 +21,7 @@ import platform
 
 class PasswordManager:
     def __init__(self):
-        self.version = "0.1.1"
+        self.version = "0.1.2"
         self.console = Console()
         self.master_hash = None
         self.is_authenticated = False
