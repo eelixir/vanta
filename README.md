@@ -38,7 +38,7 @@ pip install -r requirements.txt
 1.  **Clone the repository:**
 
     ```bash
-    git clone [https://github.com/eelixir/vanta.git](https://github.com/eelixir/vanta.git)
+    git clone https://github.com/eelixir/vanta.git
     cd vanta
     ```
 
