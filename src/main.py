@@ -624,7 +624,7 @@ class PasswordManager:
         if self.is_authenticated:
             console.clear()
             self.startup_text()
-            print("Access granted to password database!")
+            console.print("Access granted to password database!", style="green")
 
         while True:
             manager_process = console.input("[yellow]> [/yellow]").strip()
