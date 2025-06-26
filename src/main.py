@@ -606,7 +606,7 @@ class PasswordManager:
 """
         print(font)
         self.console.print(f"Version: {self.version}", style="cyan")
-        console.print("Repo: [link=https://github.com/eelixir/vanta]github.com/elixir/vanta[/link]\n", style="cyan")
+        console.print("Repo: [link=https://github.com/eelixir/vanta]github.com/eelixir/vanta[/link]\n", style="cyan")
 
     def run(self):
         """Main application loop"""
