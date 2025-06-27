@@ -301,9 +301,16 @@ class PasswordManager:
                 password = self._get_user_password()
                 break
             elif choice == "/generate" or choice == "/g":
-                password = self._generate_password()
-                print(f"\nGenerated master password: {password}")
-                print("Store this securely - you won't see it again!\n")
+                while True:
+                    length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
+
+                    if length < 16:
+                        print("Password must be atleast 16 characters.")
+                    else:
+                        password = self._generate_password(length)
+                        print(f"\nGenerated master password: {password}")
+                        print("Store this securely - you won't see it again!\n")
+                        break
                 break
             else:
                 self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
@@ -391,8 +398,15 @@ class PasswordManager:
                         password = self._get_user_password()
                         break
                     elif choice == "/generate" or choice == "/g":
-                        password = self._generate_password()
-                        print(f"This is the generated password for {website}: {password}")
+                        while True:
+                            length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
+
+                            if length < 16:
+                                print("Password must be atleast 16 characters.")
+                            else:
+                                password = self._generate_password(length)
+                                print(f"This is the generated password for {website}: {password}")
+                                break
                         break
                     else:
                         self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
@@ -474,8 +488,15 @@ class PasswordManager:
                                         new_password = self._get_user_password()
                                         break
                                     elif choice == "/generate" or choice == "/g":
-                                        new_password = self._generate_password()
-                                        print(f"This is the generated password for {website_name}: {new_password}")
+                                        while True:
+                                            length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
+
+                                            if length < 16:
+                                                print("Password must be atleast 16 characters.")
+                                            else:
+                                                new_password = self._generate_password(length)
+                                                print(f"This is the generated password for {website_name}: {new_password}")
+                                                break
                                         break
                                     else:
                                         self.console.print("Invalid input. Enter '/create' or '/generate'", style="red")
@@ -504,47 +525,47 @@ class PasswordManager:
                 print(f"Database error: {e}\n")
 
     def _handle_master(self):
-            """Change master password"""
-            with sqlite3.connect(self.DB_PATH) as connection:
-                cursor = connection.cursor()
-                try:
-                    old_fernet = self.fernet
+        """Change master password"""
+        with sqlite3.connect(self.DB_PATH) as connection:
+            cursor = connection.cursor()
+            try:
+                old_fernet = self.fernet
 
-                    # Fetch and decrypt with old key
-                    cursor.execute("SELECT id, password FROM passwords")
-                    all_passwords = cursor.fetchall()
+                # Fetch and decrypt with old key
+                cursor.execute("SELECT id, password FROM passwords")
+                all_passwords = cursor.fetchall()
 
-                    decrypted_passwords = []
-                    for pw_id, encrypted_pw_b64 in all_passwords:
-                        try:
-                            # Temporarily use old_fernet for decryption
-                            encrypted_bytes = base64.b64decode(encrypted_pw_b64.encode('utf-8'))
-                            decrypted = old_fernet.decrypt(encrypted_bytes).decode()
-                            if decrypted:
-                                decrypted_passwords.append((pw_id, decrypted))
-                            else:
-                                print(f"Failed to decrypt password for ID {pw_id} with old master key.")
-                        except Exception as e:
-                            print(f"Error decrypting password ID {pw_id}: {e}")
-
-
-                    self.create_master_password() 
-
-                    if not self.is_authenticated or not self.fernet:
-                        print("Master password change failed or was cancelled. Aborting re-encryption.")
-                        return
-
-                    # Re-encrypt and update
-                    for pw_id, decrypted in decrypted_passwords:
-                        re_encrypted = self._encrypt_password(decrypted) 
-                        if re_encrypted:
-                            cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (re_encrypted, pw_id))
+                decrypted_passwords = []
+                for pw_id, encrypted_pw_b64 in all_passwords:
+                    try:
+                        # Temporarily use old_fernet for decryption
+                        encrypted_bytes = base64.b64decode(encrypted_pw_b64.encode('utf-8'))
+                        decrypted = old_fernet.decrypt(encrypted_bytes).decode()
+                        if decrypted:
+                            decrypted_passwords.append((pw_id, decrypted))
                         else:
-                            print(f"Failed to re-encrypt password for ID {pw_id}. Data might be inconsistent.")
+                            print(f"Failed to decrypt password for ID {pw_id} with old master key.")
+                    except Exception as e:
+                        print(f"Error decrypting password ID {pw_id}: {e}")
 
-                    connection.commit()
-                except sqlite3.Error as e:
-                    print(f"Database error: {e}\n")
+
+                self.create_master_password() 
+
+                if not self.is_authenticated or not self.fernet:
+                    print("Master password change failed or was cancelled. Aborting re-encryption.")
+                    return
+
+                # Re-encrypt and update
+                for pw_id, decrypted in decrypted_passwords:
+                    re_encrypted = self._encrypt_password(decrypted) 
+                    if re_encrypted:
+                        cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (re_encrypted, pw_id))
+                    else:
+                        print(f"Failed to re-encrypt password for ID {pw_id}. Data might be inconsistent.")
+
+                connection.commit()
+            except sqlite3.Error as e:
+                print(f"Database error: {e}\n")
 
 
 
