@@ -472,7 +472,7 @@ class PasswordManager:
                                     if choice == "/create" or choice == "/c":
                                         new_password = self._get_user_password()
                                         break
-                                    elif choice == "generate" or choice == "/g":
+                                    elif choice == "/generate" or choice == "/g":
                                         new_password = self._generate_password()
                                         print(f"This is the generated password for {website_name}: {new_password}")
                                         break
