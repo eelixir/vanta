@@ -15,7 +15,6 @@ from rich.align import Align
 import platform
 
 # To-do
-# custom generate password length
 # Add ability to go back at anytime
 # entropy visualiser
 # add secure deletion with overwrites
@@ -282,7 +281,10 @@ class PasswordManager:
         while not self.is_authenticated:
             attempt = self.console.input("[yellow]> [/yellow]Enter master password: ").strip()
             
-            if self._verify_master_password(attempt):
+            if attempt == "/quit" or attempt == "/q":
+                print("Goodbye, friend.")
+                exit()
+            elif self._verify_master_password(attempt):
                 print("Master password correct")
                 self.fernet = Fernet(self._derive_key(attempt))
                 self.is_authenticated = True
@@ -665,14 +667,14 @@ class PasswordManager:
 
     def show_info(self):
         console = Console()
-        font = """ 
+        print(""" 
 ██    ██  █████  ███    ██ ████████  █████  
 ██    ██ ██   ██ ████   ██    ██    ██   ██ 
 ██    ██ ███████ ██ ██  ██    ██    ███████ 
  ██  ██  ██   ██ ██  ██ ██    ██    ██   ██ 
   ████   ██   ██ ██   ████    ██    ██   ██                                            
-"""
-        print(font)
+        """)
+        
         self.console.print(f"Version: {self.version}", style="cyan")
         console.print("Repo: [link=https://github.com/eelixir/vanta]github.com/eelixir/vanta[/link]\n", style="cyan")
 
