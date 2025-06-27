@@ -15,13 +15,14 @@ from rich.align import Align
 import platform
 
 # To-do
+# custom generate password length
 # Add ability to go back at anytime
-# Category / Tags
-# Export / import functionality
+# entropy visualiser
+# add secure deletion with overwrites
 
 class PasswordManager:
     def __init__(self):
-        self.version = "0.1.2"
+        self.version = "0.2.0"
         self.console = Console()
         self.master_hash = None
         self.is_authenticated = False
@@ -501,7 +502,52 @@ class PasswordManager:
                     print("No passwords stored yet.\n")  
             except sqlite3.Error as e:
                 print(f"Database error: {e}\n")
-                
+
+    def _handle_master(self):
+            """Change master password"""
+            with sqlite3.connect(self.DB_PATH) as connection:
+                cursor = connection.cursor()
+                try:
+                    old_fernet = self.fernet
+
+                    # Fetch and decrypt with old key
+                    cursor.execute("SELECT id, password FROM passwords")
+                    all_passwords = cursor.fetchall()
+
+                    decrypted_passwords = []
+                    for pw_id, encrypted_pw_b64 in all_passwords:
+                        try:
+                            # Temporarily use old_fernet for decryption
+                            encrypted_bytes = base64.b64decode(encrypted_pw_b64.encode('utf-8'))
+                            decrypted = old_fernet.decrypt(encrypted_bytes).decode()
+                            if decrypted:
+                                decrypted_passwords.append((pw_id, decrypted))
+                            else:
+                                print(f"Failed to decrypt password for ID {pw_id} with old master key.")
+                        except Exception as e:
+                            print(f"Error decrypting password ID {pw_id}: {e}")
+
+
+                    self.create_master_password() 
+
+                    if not self.is_authenticated or not self.fernet:
+                        print("Master password change failed or was cancelled. Aborting re-encryption.")
+                        return
+
+                    # Re-encrypt and update
+                    for pw_id, decrypted in decrypted_passwords:
+                        re_encrypted = self._encrypt_password(decrypted) 
+                        if re_encrypted:
+                            cursor.execute("UPDATE passwords SET password = ? WHERE id = ?", (re_encrypted, pw_id))
+                        else:
+                            print(f"Failed to re-encrypt password for ID {pw_id}. Data might be inconsistent.")
+
+                    connection.commit()
+                except sqlite3.Error as e:
+                    print(f"Database error: {e}\n")
+
+
+
     def _handle_delete(self):
         """Delete a password from the database"""
         with sqlite3.connect(self.DB_PATH) as connection:
@@ -585,6 +631,7 @@ class PasswordManager:
             ("/add", "add password", "/a"),
             ("/update", "update password", "/u"),
             ("/delete", "delete password", "/d"),
+            ("/master", "change master", "/m"),
             ("/quit", "quit program", "/q"),
         ]
         
@@ -647,6 +694,9 @@ class PasswordManager:
 
             elif manager_process == "/delete" or manager_process == "/d":
                 self._handle_delete()
+
+            elif manager_process == "/master" or manager_process == "/m":
+                self._handle_master()
             
             elif manager_process == "/quit" or manager_process == "/q":
                 print("Goodbye, friend.")
