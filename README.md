@@ -90,3 +90,12 @@ Once authenticated, you will see a list of available commands:
   * `/update` or `/u`: Allows you to select an entry by ID and update its username and/or password.
   * `/delete` or `/d`: Lets you select an entry by ID to delete it from the database after a confirmation prompt.
   * `/quit` or `/q`: Exits the program.
+
+
+## License
+
+Vanta is licensed under the GNU AGPL v3.
+
+---
+
+<a href="https://www.producthunt.com/products/vanta-4?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-vanta&#0045;4" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=984510&theme=neutral&t=1751025536638" alt="Vanta - A&#0032;secure&#0032;and&#0032;user&#0045;friendly&#0032;CLI&#0032;password&#0032;manager | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
