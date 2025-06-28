@@ -13,6 +13,7 @@ from rich.table import Table
 from rich.text import Text
 from rich.align import Align
 import platform
+import pyperclip
 
 # To-do
 # Add ability to go back at anytime
@@ -21,12 +22,13 @@ import platform
 
 class PasswordManager:
     def __init__(self):
-        self.version = "0.2.0"
+        self.version = "0.3.0"
         self.console = Console()
         self.master_hash = None
         self.is_authenticated = False
         self.fernet = None  
         self.DB_PATH = self._get_database_path()
+        self.most_recent_id = ""
         
         self._initialize_database() 
 
@@ -195,7 +197,6 @@ class PasswordManager:
         while True:
             password = self.console.input(f"[yellow]> [/yellow]{prompt}").strip()
             if self._check_complexity(password):
-                print("Password created successfully.")
                 return password
 
     def _hash_master_password(self, password):
@@ -366,6 +367,7 @@ class PasswordManager:
                         decrypted = self._decrypt_password(result[0])
                         if decrypted:
                             print(f"Password for entry ID {selected_id}: {decrypted}\n")
+                            self.most_recent_id = selected_id
                         else:
                             print("Failed to decrypt password.\n")
                     else:
@@ -423,6 +425,8 @@ class PasswordManager:
                                 (website, username, password) 
                                 VALUES (?, ?, ?)''', 
                             (website, username, encrypted_password))
+                
+                self.most_recent_id = cursor.lastrowid
                 
                 connection.commit()
                 print("Password added successfully.\n")
@@ -518,6 +522,7 @@ class PasswordManager:
                                 continue
                             
                         print(f"Update for ID {selected_id} complete.\n")
+                        self.most_recent_id = selected_id
 
                     else:
                         print("No password found for that ID.\n")
@@ -566,10 +571,38 @@ class PasswordManager:
                         print(f"Failed to re-encrypt password for ID {pw_id}. Data might be inconsistent.")
 
                 connection.commit()
+
             except sqlite3.Error as e:
                 print(f"Database error: {e}\n")
 
+    def _handle_copy(self):
+        """Copy most recent password to clipboard"""
+        with sqlite3.connect(self.DB_PATH) as connection:
+            cursor = connection.cursor()
+            selected_id = self.most_recent_id
 
+            try:
+                cursor.execute("SELECT id, website, username, created_at FROM passwords ORDER BY created_at DESC")
+                entries = cursor.fetchall()
+                
+                if entries:
+                    cursor.execute("SELECT password FROM passwords WHERE id = ?", (selected_id,))
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        decrypted = self._decrypt_password(result[0])
+                        if decrypted:
+                            pyperclip.copy(decrypted)
+                            print("Most recent password copied to clipboard.\n")
+                        else:
+                            print("Failed to decrypt password.\n")
+                    else:
+                        print("Failed to copy most recent password.\n")
+                else:
+                    print("No passwords stored yet.\n")
+
+            except sqlite3.Error as e:
+                print(f"Database error: {e}\n")
 
     def _handle_delete(self):
         """Delete a password from the database"""
@@ -637,24 +670,17 @@ class PasswordManager:
         console.print(Align.center(header))
         console.print()
 
-        self.show_help()
-
-    def show_help(self):
-        console = Console()
-
         table = Table(show_header=False, show_lines=False, box=None, padding=(0, 2))
         table.add_column("Command", style="dim white", width=17)
         table.add_column("Description", style="white", width=20)
         table.add_column("Shortcut", style="dim white", width=10)
         
         commands = [
-            ("/help", "show help", "/h"),
-            ("/info", "version details", "/i"),
+            ("/help", "all commands", "/h"),
             ("/view", "view passwords", "/v"),
             ("/add", "add password", "/a"),
             ("/update", "update password", "/u"),
             ("/delete", "delete password", "/d"),
-            ("/master", "change master", "/m"),
             ("/quit", "quit program", "/q"),
         ]
         
@@ -663,6 +689,33 @@ class PasswordManager:
         
         print("")
         console.print(Align.center(table))
+        console.print()
+
+    def show_help(self):
+        console = Console()
+
+        table = Table(show_header=False, show_lines=False, box=None, padding=(0, 2))
+        table.add_column("Command", style="dim white", width=10)
+        table.add_column("Description", style="white", width=20)
+        table.add_column("Shortcut", style="dim white", width=10)
+        
+        commands = [
+            ("/help", "all commands", "/h"),
+            ("/info", "version details", "/i"),
+            ("/view", "view passwords", "/v"),
+            ("/add", "add password", "/a"),
+            ("/update", "update password", "/u"),
+            ("/delete", "delete password", "/d"),
+            ("/copy", "copy to clipboard", "/c"),
+            ("/master", "change master", "/m"),
+            ("/quit", "quit program", "/q"),
+        ]
+        
+        for cmd, desc, shortcut in commands:
+            table.add_row(cmd, desc, shortcut)
+        
+        print("")
+        console.print(Align.left(table))
         console.print()
 
     def show_info(self):
@@ -717,6 +770,9 @@ class PasswordManager:
 
             elif manager_process == "/delete" or manager_process == "/d":
                 self._handle_delete()
+
+            elif manager_process == "/copy" or manager_process == "/c":
+                self._handle_copy()
 
             elif manager_process == "/master" or manager_process == "/m":
                 self._handle_master()
