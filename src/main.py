@@ -16,6 +16,11 @@ import platform
 import pyperclip
 
 # To-do
+# Command Handling: a dictionary mapping commands to methods 
+# could be cleaner (e.g., self.commands = {"/help": self.show_help, ...} 
+# and then self.commands.get(manager_process, lambda: None)() ). 
+
+# add /copy to work for master password
 # Add ability to go back at anytime
 # entropy visualiser
 # add secure deletion with overwrites
@@ -305,12 +310,14 @@ class PasswordManager:
                 break
             elif choice == "/generate" or choice == "/g":
                 while True:
-                    length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
-
-                    if length < 16:
+                    length = self.console.input("[yellow]> [/yellow]Enter password length (min 16): ")
+                    
+                    if length.isdigit() == False:
+                        print("Password must be an integer.")
+                    elif int(length) < 16:
                         print("Password must be atleast 16 characters.")
                     else:
-                        password = self._generate_password(length)
+                        password = self._generate_password(int(length))
                         print(f"\nGenerated master password: {password}")
                         print("Store this securely - you won't see it again!\n")
                         break
@@ -403,12 +410,14 @@ class PasswordManager:
                         break
                     elif choice == "/generate" or choice == "/g":
                         while True:
-                            length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
+                            length = self.console.input("[yellow]> [/yellow]Enter password length (min 16): ")
 
-                            if length < 16:
+                            if length.isdigit() == False:
+                                print("Password must be an integer.")
+                            elif int(length) < 16:
                                 print("Password must be atleast 16 characters.")
                             else:
-                                password = self._generate_password(length)
+                                password = self._generate_password(int(length))
                                 print(f"This is the generated password for {website}: {password}")
                                 break
                         break
@@ -495,12 +504,14 @@ class PasswordManager:
                                         break
                                     elif choice == "/generate" or choice == "/g":
                                         while True:
-                                            length = int(self.console.input("[yellow]> [/yellow]Enter password length (min 16): "))
+                                            length = self.console.input("[yellow]> [/yellow]Enter password length (min 16): ")
 
-                                            if length < 16:
+                                            if length.isdigit() == False:
+                                                print("Password must be an integer.")
+                                            elif int(length) < 16:
                                                 print("Password must be atleast 16 characters.")
                                             else:
-                                                new_password = self._generate_password(length)
+                                                new_password = self._generate_password(int(length))
                                                 print(f"This is the generated password for {website_name}: {new_password}")
                                                 break
                                         break
