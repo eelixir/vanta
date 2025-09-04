@@ -16,12 +16,6 @@ import platform
 import pyperclip
 
 # To-do
-# Command Handling: a dictionary mapping commands to methods 
-# could be cleaner (e.g., self.commands = {"/help": self.show_help, ...} 
-# and then self.commands.get(manager_process, lambda: None)() ). 
-
-# add /copy to work for master password
-# Add ability to go back at anytime
 # entropy visualiser
 # add secure deletion with overwrites
 
