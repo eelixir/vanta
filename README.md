@@ -93,7 +93,7 @@ Once authenticated, you will see a list of available commands:
   * `/add` or `/a`: Guides you through adding a new password entry, allowing you to create your own password or generate a random one.
   * `/update` or `/u`: Allows you to select an entry by ID and update its username and/or password.
   * `/delete` or `/d`: Lets you select an entry by ID to delete it from the database after a confirmation prompt.
-  * `/copy` or `/c`: Copys your most recent password to your clipboard.
+  * `/copy` or `/c`: Copies the most recently viewed password to your clipboard.
   * `/master` or `/m`: Allows you to change the master password.
   * `/quit` or `/q`: Exits the program.
 
