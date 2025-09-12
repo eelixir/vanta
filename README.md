@@ -26,6 +26,8 @@ Vanta is a command-line interface (CLI) password manager designed for secure and
 * `bcrypt`
 * `cryptography`
 * `rich`
+* `pytest`
+* `pyperclip`
 
 You can install the required Python packages using pip:
 
@@ -74,13 +76,15 @@ After setting up or if a master password already exists, you will be prompted to
 Once authenticated, you will see a list of available commands:
 
 ```
-> /help            show help              /h
-> /info            version details        /i
-> /view            view passwords         /v
-> /add             add password           /a
-> /update          update password        /u
-> /delete          delete password        /d
-> /quit            quit program           /q
+  /help         all commands            /h
+  /info         version details         /i
+  /view         view passwords          /v
+  /add          add password            /a
+  /update       update password         /u
+  /delete       delete password         /d
+  /copy         copy to clipboard       /c
+  /master       change master           /m
+  /quit         quit program            /q
 ```
 
   * `/help` or `/h`: Displays the list of available commands.
@@ -89,6 +93,8 @@ Once authenticated, you will see a list of available commands:
   * `/add` or `/a`: Guides you through adding a new password entry, allowing you to create your own password or generate a random one.
   * `/update` or `/u`: Allows you to select an entry by ID and update its username and/or password.
   * `/delete` or `/d`: Lets you select an entry by ID to delete it from the database after a confirmation prompt.
+  * `/copy` or `/c`: Copys your most recent password to your clipboard.
+  * `/master` or `/m`: Allows you to change the master password.
   * `/quit` or `/q`: Exits the program.
 
 
