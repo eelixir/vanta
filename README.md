@@ -1,6 +1,6 @@
 # Vanta
 
-## A secure and user-friendly CLI password manager.
+> A secure and user-friendly CLI password manager.
 
 Vanta is a command-line interface (CLI) password manager designed for secure and easy management of your login credentials. It uses strong encryption and provides a straightforward interface for viewing, adding, updating, and deleting your passwords.
 
